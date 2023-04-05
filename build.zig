@@ -15,6 +15,39 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
+    // Get otp_dir extracting it from the erlang shell
+    const erl_argv = [_][]const u8{
+        "erl",
+        "-eval",
+        "io:format(\"~s\", [code:root_dir()])",
+        "-s",
+        "init",
+        "stop",
+        "-noshell",
+    };
+
+    // TODO: find a way to extract the version of erl_interface from a command/env
+    const erl_interface_version = "erl_interface-5.3";
+
+    const otp_dir = b.exec(&erl_argv);
+    defer b.allocator.free(otp_dir);
+
+    const ei_include_dir = std.fs.path.join(b.allocator, &[_][]const u8{
+        otp_dir,
+        "lib",
+        erl_interface_version,
+        "include",
+    }) catch unreachable;
+    defer b.allocator.free(ei_include_dir);
+
+    const ei_lib_dir = std.fs.path.join(b.allocator, &[_][]const u8{
+        otp_dir,
+        "lib",
+        erl_interface_version,
+        "lib",
+    }) catch unreachable;
+    defer b.allocator.free(ei_lib_dir);
+
     const exe = b.addExecutable(.{
         .name = "zig_cnode_poc",
         // In this case the main source file is merely a path, however, in more
@@ -28,6 +61,15 @@ pub fn build(b: *std.Build) void {
     // standard location when the user invokes the "install" step (the default
     // step when running `zig build`).
     exe.install();
+    // Include the erl_interface include dir
+    exe.addSystemIncludePath(ei_include_dir);
+    // Add erl_interface dir to library path
+    exe.addLibraryPath(ei_lib_dir);
+    // Link to libc since we're calling C code
+    exe.linkLibC();
+    // Link libei, aka erl_interface
+    exe.linkSystemLibrary("ei");
+
 
     // This *creates* a RunStep in the build graph, to be executed when another
     // step is evaluated that depends on it. The next line below will establish
