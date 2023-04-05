@@ -44,13 +44,16 @@ pub fn main() !void {
 
         const rcv = c.ei_xreceive_msg(connection.fd, &msg, &buf);
         switch (rcv) {
+            c.ERL_MSG => {},
             // Tick from the other node, ignore
             c.ERL_TICK => {
                 std.debug.print("Received tick\n", .{});
                 continue;
             },
-            c.ERL_ERROR => return error.ReceiveError,
-            else => {},
+            c.ERL_ERROR => {
+                return error.ReceiveError;
+            },
+            else => unreachable,
         }
 
         switch (msg.msgtype) {
